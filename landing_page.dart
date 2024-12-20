@@ -26,10 +26,19 @@ class LandingPage extends StatefulWidget {
 class _LandingPageState extends State<LandingPage> {
   // List of available profile pictures
   final List<String> _profilePics = [
-    'assets/images/pfp1.png',
-    'assets/images/pfp2.png',
-    'assets/images/pfp3.png',
-    'assets/images/pfp4.png',
+    'assets/images/pfps/1.png',
+    'assets/images/pfps/2.png',
+    'assets/images/pfps/3.png',
+    'assets/images/pfps/4.png',
+    'assets/images/pfps/5.png',
+    'assets/images/pfps/6.png',
+    'assets/images/pfps/7.png',
+    'assets/images/pfps/8.png',
+    'assets/images/pfps/9.png',
+    'assets/images/pfps/10.png',
+    'assets/images/pfps/11.png',
+    'assets/images/pfps/12.png',
+
   ];
 
   // Currently selected profile picture
