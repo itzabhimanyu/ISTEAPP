@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_calendar_carousel/flutter_calendar_carousel.dart';
+import 'calendar_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -24,7 +26,6 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  // List of available profile pictures
   final List<String> _profilePics = [
     'assets/images/pfps/1.png',
     'assets/images/pfps/2.png',
@@ -38,7 +39,6 @@ class _LandingPageState extends State<LandingPage> {
     'assets/images/pfps/10.png',
     'assets/images/pfps/11.png',
     'assets/images/pfps/12.png',
-
   ];
 
   // Currently selected profile picture
@@ -83,8 +83,17 @@ class _LandingPageState extends State<LandingPage> {
         title: const Text('I S T E'),
         centerTitle: true,
         leading: const Icon(Icons.menu),
-        actions: const [
-          Icon(Icons.calendar_today),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: () {
+              // Navigate to the calendar page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarPage()),
+              );
+            },
+          ),
         ],
       ),
       body: Container(
