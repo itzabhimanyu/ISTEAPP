@@ -47,6 +47,21 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   bool _isAnimating = false;
 
+  final DateTime _firstDay = DateTime(2024, 1, 1);
+  final DateTime _lastDay = DateTime(2024, 12, 31);
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Ensure focusedDay is within the valid range
+    if (_focusedDay.isBefore(_firstDay)) {
+      _focusedDay = _firstDay;
+    } else if (_focusedDay.isAfter(_lastDay)) {
+      _focusedDay = _lastDay;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedEvents = _events[_selectedDay] ?? [];
@@ -77,8 +92,8 @@ class _CalendarPageState extends State<CalendarPage> {
       body: Column(
         children: [
           TableCalendar(
-            firstDay: DateTime(2024, 1, 1),
-            lastDay: DateTime(2024, 12, 31),
+            firstDay: _firstDay,
+            lastDay: _lastDay,
             focusedDay: _focusedDay,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             calendarFormat: CalendarFormat.month,
@@ -86,6 +101,14 @@ class _CalendarPageState extends State<CalendarPage> {
               setState(() {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
+
+                // Ensure focusedDay is within the valid range
+                if (_focusedDay.isBefore(_firstDay)) {
+                  _focusedDay = _firstDay;
+                } else if (_focusedDay.isAfter(_lastDay)) {
+                  _focusedDay = _lastDay;
+                }
+
                 _isAnimating = true;
               });
               Future.delayed(const Duration(milliseconds: 300), () {
@@ -173,8 +196,21 @@ class AdminPage extends StatefulWidget {
 class _AdminPageState extends State<AdminPage> {
   final TextEditingController _eventController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+  DateTime _focusedDay = DateTime.now();  // Add this line to control focusedDay
   final String _adminPassword = "admin123";
   bool _isAuthenticated = false;
+
+  final DateTime _firstDay = DateTime(2024, 1, 1);
+  final DateTime _lastDay = DateTime(2024, 12, 31);
+
+  // Ensure focusedDay is within the valid range
+  void _validateFocusedDay() {
+    if (_focusedDay.isBefore(_firstDay)) {
+      _focusedDay = _firstDay;
+    } else if (_focusedDay.isAfter(_lastDay)) {
+      _focusedDay = _lastDay;
+    }
+  }
 
   void _authenticate(String password) {
     if (password == _adminPassword) {
@@ -190,6 +226,9 @@ class _AdminPageState extends State<AdminPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure the selected date is within bounds
+    _validateFocusedDay();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin - Assign Events'),
@@ -199,13 +238,16 @@ class _AdminPageState extends State<AdminPage> {
           ? Column(
         children: [
           TableCalendar(
-            firstDay: DateTime(2024, 1, 1),
-            lastDay: DateTime(2024, 12, 31),
-            focusedDay: _selectedDate,
+            firstDay: _firstDay,
+            lastDay: _lastDay,
+            focusedDay: _focusedDay,
             selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
             onDaySelected: (selectedDay, focusedDay) {
               setState(() {
                 _selectedDate = selectedDay;
+                _focusedDay = focusedDay;
+                // Ensure focusedDay is within the valid range
+                _validateFocusedDay();
               });
             },
             calendarFormat: CalendarFormat.month,
