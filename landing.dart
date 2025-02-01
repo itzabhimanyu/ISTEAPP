@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:tired/screen/signin.dart';
 import 'package:tired/change.dart';
-import 'package:tired/calendar_page.dart';
-import 'Profile_page.dart';
-import 'Team_page.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -35,6 +34,245 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class CalendarPage extends StatefulWidget {
+  const CalendarPage({super.key});
+
+  @override
+  State<CalendarPage> createState() => _CalendarPageState();
+}
+
+class _CalendarPageState extends State<CalendarPage> {
+  final Map<DateTime, List<String>> _events = {};
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  bool _isAnimating = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedEvents = _events[_selectedDay] ?? [];
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.lightBlueAccent,
+        title: const Text('Club Calendar'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.lock),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AdminPage(events: _events, onUpdate: (updatedEvents) {
+                    setState(() {
+                      _events.clear();
+                      _events.addAll(updatedEvents);
+                    });
+                  }),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          TableCalendar(
+            startingDayOfWeek: StartingDayOfWeek.monday,
+            firstDay: DateTime(2024, 1, 1),
+            lastDay: DateTime(2024, 12, 31),
+            focusedDay: _focusedDay,
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            calendarFormat: CalendarFormat.month,
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+                _isAnimating = true;
+              });
+              Future.delayed(const Duration(milliseconds: 300), () {
+                setState(() {
+                  _isAnimating = false;
+                });
+              });
+            },
+            eventLoader: (day) => _events[day] ?? [],
+            calendarStyle: CalendarStyle(
+              todayDecoration: BoxDecoration(
+                color: Colors.teal,
+                shape: BoxShape.circle,
+              ),
+              selectedDecoration: BoxDecoration(
+                color: Colors.tealAccent,
+                shape: BoxShape.circle,
+              ),
+              defaultTextStyle: const TextStyle(color: Colors.black),
+              weekendTextStyle: const TextStyle(color: Colors.redAccent),
+            ),
+            headerStyle: const HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+              titleTextStyle: TextStyle(color: Colors.black, fontSize: 18),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _isAnimating
+                  ? const Center(
+                child: CircularProgressIndicator(color: Colors.teal),
+              )
+                  : selectedEvents.isEmpty
+                  ? Center(
+                child: Text(
+                  'No events for this day.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              )
+                  : ListView.builder(
+                key: ValueKey(_selectedDay),
+                itemCount: selectedEvents.length,
+                itemBuilder: (context, index) {
+                  return AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: 1.0,
+                    child: Card(
+                      color: Colors.grey[900],
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.event, color: Colors.teal),
+                        title: Text(
+                          selectedEvents[index],
+                          style: const TextStyle(fontSize: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminPage extends StatefulWidget {
+  final Map<DateTime, List<String>> events;
+  final Function(Map<DateTime, List<String>>) onUpdate;
+
+  const AdminPage({super.key, required this.events, required this.onUpdate});
+
+  @override
+  State<AdminPage> createState() => _AdminPageState();
+}
+
+class _AdminPageState extends State<AdminPage> {
+  final TextEditingController _eventController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+  final String _adminPassword = "admin123";
+  bool _isAuthenticated = false;
+
+  void _authenticate(String password) {
+    if (password == _adminPassword) {
+      setState(() {
+        _isAuthenticated = true;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid Password')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Admin - Assign Events'),
+        centerTitle: true,
+      ),
+      body: _isAuthenticated
+          ? Column(
+        children: [
+          TableCalendar(
+            firstDay: DateTime(2024, 1, 1),
+            lastDay: DateTime(2024, 12, 31),
+            focusedDay: _selectedDate,
+            selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDate = selectedDay;
+              });
+            },
+            calendarFormat: CalendarFormat.month,
+            calendarStyle: const CalendarStyle(
+              selectedDecoration: BoxDecoration(
+                color: Colors.teal,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _eventController,
+              decoration: const InputDecoration(
+                labelText: 'Event Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_eventController.text.isNotEmpty) {
+                setState(() {
+                  if (widget.events[_selectedDate] == null) {
+                    widget.events[_selectedDate] = [];
+                  }
+                  widget.events[_selectedDate]?.add(_eventController.text);
+                  widget.onUpdate(widget.events);
+                });
+                _eventController.clear();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Event added successfully!')),
+                );
+              }
+            },
+            child: const Text('Add Event'),
+          ),
+        ],
+      )
+          : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Enter Admin Password',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: _authenticate,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class ISTEApp extends StatefulWidget {
   const ISTEApp({super.key});
@@ -49,9 +287,9 @@ class _ISTEAppState extends State<ISTEApp> {
 
   final List<Widget> pages = [
     LandingPage(),
-    CalendarPage(),
+    ChatPage(),
     TeamPage(),
-    ProfilePage()
+    MoreOptionsPage(),
   ];
 
   @override
@@ -71,7 +309,7 @@ class _ISTEAppState extends State<ISTEApp> {
         ),
         leading: IconButton(
           icon: Icon(
-            Icons.more_vert_rounded,
+            Icons.calendar_today_sharp,
             color: isDarkMode ? Colors.white : Colors.black,
           ),
           onPressed: () {
@@ -79,11 +317,24 @@ class _ISTEAppState extends State<ISTEApp> {
               context,
               MaterialPageRoute(
                 builder: (context) =>
-                const MoreOptionsPage(),
+                const CalendarPage(),
               ),
             );
           },
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+            onPressed: () {
+              setState(() {
+                isDarkMode = !isDarkMode;
+              });
+            },
+          ),
+        ],
         shape: Border(
           bottom: BorderSide(
             color: isDarkMode ? Colors.white : Colors.black,
@@ -119,102 +370,17 @@ class _ISTEAppState extends State<ISTEApp> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Calendar',
+            icon: Icon(Icons.chat),
+            label: 'Chat',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.group),
             label: 'Team',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+            icon: Icon(Icons.more_horiz),
+            label: 'More Options',
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class ChatPage extends StatelessWidget {
-  const ChatPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Center(
-      child: Text(
-        'New chats here!',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-    );
-  }
-}
-
-class MoreOptionsPage extends StatelessWidget {
-  const MoreOptionsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'More Options',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-      body: ListView(
-        children: [
-          Divider(color: isDarkMode ? Colors.white : Colors.black),
-          ListTile(
-            leading: Icon(
-              Icons.lock,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            title: Text(
-              'Change Password',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChangePasswordScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: isDarkMode ? Colors.white : Colors.black),
-          ListTile(
-            leading: Icon(
-              Icons.logout,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            title: Text(
-              'Log Out',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SignInScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: isDarkMode ? Colors.white : Colors.black),
         ],
       ),
     );
@@ -226,7 +392,7 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode =
+        final isDarkMode =
     (Theme.of(context).brightness == Brightness.dark); // Local check
 
     return SingleChildScrollView(
@@ -249,7 +415,7 @@ class LandingPage extends StatelessWidget {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'ABHIMANYU BINU',
+                    'CHAITANYA MENON',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -264,7 +430,7 @@ class LandingPage extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'NUB',
+                    'Mazdoor',
                     style: TextStyle(
                       fontSize: 14,
                       color: isDarkMode ? Colors.white70 : Colors.black54,
@@ -355,7 +521,7 @@ class NotificationBox extends StatelessWidget {
   final String message;
   final bool isDarkMode;
 
-  const NotificationBox({super.key,
+  const NotificationBox({super.key, 
     required this.sender,
     required this.message,
     required this.isDarkMode,
@@ -405,6 +571,187 @@ class NotificationBox extends StatelessWidget {
   }
 }
 
+class ChatPage extends StatelessWidget {
+  const ChatPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Center(
+      child: Text(
+        'New chats here!',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
+    );
+  }
+}
+
+class TeamPage extends StatelessWidget {
+  const TeamPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Center(
+      child: Text(
+        'Team Details here!',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
+    );
+  }
+}
+
+class MoreOptionsPage extends StatelessWidget {
+  const MoreOptionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return ListView(
+      children: [
+        ListTile(
+          leading: Icon(
+            Icons.person,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+          title: Text(
+            'Profile',
+            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProfilePage(isDarkMode: isDarkMode),
+              ),
+            );
+          },
+        ),
+        Divider(color: isDarkMode ? Colors.white : Colors.black),
+        ListTile(
+          leading: Icon(
+            Icons.lock,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+          title: Text(
+            'Change Password',
+            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ChangePasswordScreen()
+              ),
+            );
+          },
+        ),
+        Divider(color: isDarkMode ? Colors.white : Colors.black),
+        ListTile(
+          leading: const Icon(Icons.logout),  // Optional: adds logout icon
+          title: const Text('Logout'),
+          onTap: () async {
+            await FirebaseAuth.instance.signOut();
+            if (context.mounted) {  // Use context.mounted instead of just mounted
+              Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SignInScreen()),
+                      (route) => false
+              );
+            }
+          },
+        ),
+        Divider(color: isDarkMode ? Colors.white : Colors.black),
+      ],
+    );
+  }
+}
+
+class ProfilePage extends StatelessWidget {
+  final bool isDarkMode;
+
+  const ProfilePage({super.key, required this.isDarkMode});
+
+  @override
+  Widget build(BuildContext context) {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser?.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final userData = snapshot.data?.data() as Map<String, dynamic>?;
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const CircleAvatar(
+                  radius: 50,
+                  child: Icon(Icons.person, size: 50),
+                ),
+                const SizedBox(height: 20),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.person_outline),
+                          title: const Text('Name'),
+                          subtitle: Text(userData?['name'] ?? 'Not set'),
+                        ),
+                        const Divider(),
+                        ListTile(
+                          leading: const Icon(Icons.numbers),
+                          title: const Text('Roll Number'),
+                          subtitle: Text(userData?['rollNo'] ?? 'Not set'),
+                        ),
+                        const Divider(),
+                        ListTile(
+                          leading: const Icon(Icons.email_outlined),
+                          title: const Text('Email'),
+                          subtitle: Text(currentUser?.email ?? 'Not set'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class ChangePasswordPage extends StatelessWidget {
   final bool isDarkMode;
