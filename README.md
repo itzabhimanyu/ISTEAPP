@@ -1,8 +1,8 @@
-# tired
+# TIRED
 
 ISTE App.
 
-Login details:
+Debug Login details:
 
 Email: 1@test.com
 Password: testnum3
